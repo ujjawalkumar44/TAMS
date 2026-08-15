@@ -34,9 +34,10 @@ class MarksService:
             )
 
     def _validate_marks(self, field: str, value: float):
-        if field not in ASSESSMENT_FIELD_MAP:
+        field_to_max = {v[0]: v[1] for v in ASSESSMENT_FIELD_MAP.values()}
+        if field not in field_to_max:
             raise HTTPException(status_code=400, detail=f"Invalid assessment type: {field}")
-        _, max_val = ASSESSMENT_FIELD_MAP[field]
+        max_val = field_to_max[field]
         if value > max_val:
             raise HTTPException(
                 status_code=400,

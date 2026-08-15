@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Save, RefreshCw } from 'lucide-react';
+import { Save, RefreshCw, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { assignmentsAPI, marksAPI } from '../services';
 import { getErrorMessage } from '../services/api';
@@ -37,6 +37,7 @@ export default function Marks() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   useEffect(() => {
     assignmentsAPI.list().then((res) => setAssignments(res.data)).catch(() => {});
@@ -65,10 +66,12 @@ export default function Marks() {
       const res = await marksAPI.getSheet({ subject_id: subjectId, section_id: sectionId });
       setSheet(res.data);
       setEntries(res.data.entries.map((e) => ({ ...e })));
+      setHasUnsavedChanges(false);
     } catch (err) {
       setError(getErrorMessage(err));
       setSheet(null);
       setEntries([]);
+      setHasUnsavedChanges(false);
     } finally {
       setLoading(false);
     }
@@ -84,6 +87,7 @@ export default function Marks() {
     setEntries((prev) =>
       prev.map((e) => (e.student_id === studentId ? { ...e, [field]: num } : e))
     );
+    setHasUnsavedChanges(true);
   };
 
   const validateEntry = (entry) => {
@@ -135,6 +139,7 @@ export default function Marks() {
 
       const res = await marksAPI.bulkSave(payload);
       toast.success(res.data.message);
+      setHasUnsavedChanges(false);
       loadSheet();
     } catch (err) {
       toast.error(getErrorMessage(err));
@@ -180,11 +185,18 @@ export default function Marks() {
             <button onClick={loadSheet} disabled={!subjectId || !sectionId || loading} className="btn-secondary flex-1">
               <RefreshCw className="h-4 w-4" /> Reload
             </button>
-            <button onClick={handleSaveAll} disabled={!entries.length || saving} className="btn-primary flex-1">
+            <button onClick={handleSaveAll} disabled={!entries.length || saving || !hasUnsavedChanges} className="btn-primary flex-1">
               {saving ? <LoadingSpinner size="sm" /> : <><Save className="h-4 w-4" /> Save All</>}
             </button>
           </div>
         </div>
+
+        {hasUnsavedChanges && (
+          <div className="flex items-center gap-2 rounded-md bg-amber-50 p-3 text-amber-700">
+            <AlertCircle className="h-5 w-5 text-amber-500" />
+            <span className="text-sm font-medium">You have unsaved changes. Don't forget to save!</span>
+          </div>
+        )}
 
         {sheet && (
           <p className="text-sm text-slate-500">
