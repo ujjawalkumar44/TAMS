@@ -12,6 +12,7 @@ import toast from 'react-hot-toast';
 import { analyticsAPI } from '../services';
 import { getErrorMessage } from '../services/api';
 import { usePageTitle, RISK_COLORS } from '../utils/helpers';
+import { useAppContext } from '../context/AppContext';
 import StatCard from '../components/ui/StatCard';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { ErrorState } from '../components/ui/EmptyState';
@@ -20,11 +21,11 @@ const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'
 
 export default function Dashboard() {
   usePageTitle('Dashboard');
+  const { activeAcademicYear } = useAppContext();
   const [filters, setFilters] = useState({ subjects: [], sections: [], semesters: [], academic_years: [] });
   const [subjectId, setSubjectId] = useState('');
   const [sectionId, setSectionId] = useState('');
   const [semester, setSemester] = useState('');
-  const [academicYear, setAcademicYear] = useState('');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -34,14 +35,14 @@ export default function Dashboard() {
   }, []);
 
   const loadDashboard = useCallback(async () => {
+    if (!activeAcademicYear) return;
     setLoading(true);
     setError(null);
     try {
-      const params = {};
+      const params = { academic_year: activeAcademicYear };
       if (subjectId) params.subject_id = subjectId;
       if (sectionId) params.section_id = sectionId;
       if (semester) params.semester = semester;
-      if (academicYear) params.academic_year = academicYear;
       const res = await analyticsAPI.getDashboard(params);
       setData(res.data);
     } catch (err) {
@@ -50,15 +51,33 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, [subjectId, sectionId, semester, academicYear]);
+  }, [subjectId, sectionId, semester, activeAcademicYear]);
 
   useEffect(() => { loadDashboard(); }, [loadDashboard]);
+
+  // Handle dependent filter resets
+  useEffect(() => {
+    // If activeAcademicYear changes, reset everything dependent
+    setSemester('');
+    setSectionId('');
+    setSubjectId('');
+  }, [activeAcademicYear]);
+
+  const handleSemesterChange = (e) => {
+    setSemester(e.target.value);
+    setSectionId('');
+    setSubjectId('');
+  };
+
+  const handleSectionChange = (e) => {
+    setSectionId(e.target.value);
+    setSubjectId('');
+  };
 
   const clearFilters = () => {
     setSubjectId('');
     setSectionId('');
     setSemester('');
-    setAcademicYear('');
   };
 
   if (loading && !data) {
@@ -83,26 +102,23 @@ export default function Dashboard() {
           </div>
           <div>
             <label className="label">Section</label>
-            <select className="input-field" value={sectionId} onChange={(e) => setSectionId(e.target.value)}>
+            <select className="input-field" value={sectionId} onChange={handleSectionChange}>
               <option value="">All Sections</option>
-              {filters.sections.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {filters.sections.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} {s.semester ? `(Sem ${s.semester}, ${s.academic_year})` : ''}
+                </option>
+              ))}
             </select>
           </div>
           <div>
             <label className="label">Semester</label>
-            <select className="input-field" value={semester} onChange={(e) => setSemester(e.target.value)}>
+            <select className="input-field" value={semester} onChange={handleSemesterChange}>
               <option value="">All Semesters</option>
               {filters.semesters.map((s) => <option key={s} value={s}>Semester {s}</option>)}
             </select>
           </div>
-          <div>
-            <label className="label">Academic Year</label>
-            <select className="input-field" value={academicYear} onChange={(e) => setAcademicYear(e.target.value)}>
-              <option value="">All Years</option>
-              {filters.academic_years.map((y) => <option key={y} value={y}>{y}</option>)}
-            </select>
-          </div>
-          <div className="flex items-end">
+          <div className="flex items-end md:col-span-2 lg:col-span-2">
             <button onClick={clearFilters} className="btn-secondary w-full">Clear Filters</button>
           </div>
         </div>
@@ -128,9 +144,9 @@ export default function Dashboard() {
               View all <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
-          <div className="overflow-x-auto">
+          <div className="table-container">
             <table className="w-full text-left text-sm">
-              <thead className="border-b bg-slate-50">
+              <thead className="table-header">
                 <tr>
                   <th className="px-3 py-2 font-medium text-slate-600">Student</th>
                   <th className="px-3 py-2 font-medium text-slate-600">Section</th>
@@ -143,7 +159,7 @@ export default function Dashboard() {
               </thead>
               <tbody>
                 {data.students_needing_attention.slice(0, 5).map((s) => (
-                  <tr key={`${s.student_id}-${s.subject}`} className="border-b border-slate-100">
+                  <tr key={`${s.student_id}-${s.subject}`} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
                     <td className="px-3 py-2">
                       <Link to={`/students/${s.student_id}`} className="font-medium text-primary-600 hover:underline">{s.name}</Link>
                       <span className="block text-xs text-slate-400">{s.roll_number}</span>
@@ -231,9 +247,9 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="card">
           <h3 className="mb-4 font-semibold text-slate-900">Section Comparison</h3>
-          <div className="overflow-x-auto">
+          <div className="table-container">
             <table className="w-full text-left text-sm">
-              <thead className="border-b bg-slate-50">
+              <thead className="table-header">
                 <tr>
                   <th className="px-3 py-2 font-medium text-slate-600">Section</th>
                   <th className="px-3 py-2 font-medium text-slate-600">Students</th>
@@ -244,7 +260,7 @@ export default function Dashboard() {
               </thead>
               <tbody>
                 {data.section_comparison.map((s) => (
-                  <tr key={s.section_id} className="border-b border-slate-100">
+                  <tr key={s.section_id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
                     <td className="px-3 py-2 font-medium">{s.section_name}</td>
                     <td className="px-3 py-2">{s.students}</td>
                     <td className="px-3 py-2">{s.avg_marks}%</td>
@@ -259,9 +275,9 @@ export default function Dashboard() {
 
         <div className="card">
           <h3 className="mb-4 font-semibold text-slate-900">Subject Comparison</h3>
-          <div className="overflow-x-auto">
+          <div className="table-container">
             <table className="w-full text-left text-sm">
-              <thead className="border-b bg-slate-50">
+              <thead className="table-header">
                 <tr>
                   <th className="px-3 py-2 font-medium text-slate-600">Subject</th>
                   <th className="px-3 py-2 font-medium text-slate-600">Students</th>
@@ -272,7 +288,7 @@ export default function Dashboard() {
               </thead>
               <tbody>
                 {data.subject_comparison.map((s) => (
-                  <tr key={s.subject_id} className="border-b border-slate-100">
+                  <tr key={s.subject_id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
                     <td className="px-3 py-2 font-medium">{s.subject_name}</td>
                     <td className="px-3 py-2">{s.students}</td>
                     <td className="px-3 py-2">{s.avg_marks}%</td>

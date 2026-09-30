@@ -3,16 +3,14 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
-AssessmentType = Literal["assignment", "quiz", "internal", "midterm", "endterm"]
+AssessmentType = Literal["internal", "midterm", "endterm"]
 
 
 class AssessmentConfig(BaseModel):
-    assignment: float = 20
-    quiz: float = 20
-    internal: float = 20
-    midterm: float = 50
-    endterm: float = 100
-    total: float = 210
+    internal: float = 30
+    midterm: float = 20
+    endterm: float = 50
+    total: float = 100
 
 
 class MarkEntryResponse(BaseModel):
@@ -20,8 +18,6 @@ class MarkEntryResponse(BaseModel):
     roll_number: str
     name: str
     mark_record_id: Optional[int] = None
-    assignment_marks: float = 0
-    quiz_marks: float = 0
     internal_marks: float = 0
     midterm_marks: float = 0
     endterm_marks: float = 0
@@ -41,8 +37,6 @@ class MarksSheetResponse(BaseModel):
 class BulkMarkEntry(BaseModel):
     student_id: int
     marks: Optional[float] = Field(None, ge=0)
-    assignment_marks: Optional[float] = Field(None, ge=0)
-    quiz_marks: Optional[float] = Field(None, ge=0)
     internal_marks: Optional[float] = Field(None, ge=0)
     midterm_marks: Optional[float] = Field(None, ge=0)
     endterm_marks: Optional[float] = Field(None, ge=0)
@@ -65,8 +59,6 @@ class MarkRecordResponse(BaseModel):
     student_id: int
     subject_id: int
     section_id: int
-    assignment_marks: float
-    quiz_marks: float
     internal_marks: float
     midterm_marks: float
     endterm_marks: float
@@ -79,8 +71,6 @@ class MarkRecordResponse(BaseModel):
 
 
 class MarkRecordUpdate(BaseModel):
-    assignment_marks: Optional[float] = Field(None, ge=0)
-    quiz_marks: Optional[float] = Field(None, ge=0)
     internal_marks: Optional[float] = Field(None, ge=0)
     midterm_marks: Optional[float] = Field(None, ge=0)
     endterm_marks: Optional[float] = Field(None, ge=0)

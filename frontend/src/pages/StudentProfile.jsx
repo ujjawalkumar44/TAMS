@@ -13,6 +13,7 @@ import { getErrorMessage } from '../services/api';
 import { usePageTitle, RISK_COLORS, TREND_COLORS } from '../utils/helpers';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { ErrorState } from '../components/ui/EmptyState';
+import { useAppContext } from '../context/AppContext';
 
 function TrendIcon({ trend }) {
   if (trend === 'Improving') return <TrendingUp className="h-4 w-4" />;
@@ -22,7 +23,7 @@ function TrendIcon({ trend }) {
 
 function SubjectAnalyticsCard({ subject, isExpanded, onToggle }) {
   return (
-    <div className="card overflow-hidden p-0">
+    <div className="card overflow-hidden p-0 glass-panel">
       <button
         type="button"
         onClick={onToggle}
@@ -73,11 +74,9 @@ function SubjectAnalyticsCard({ subject, isExpanded, onToggle }) {
             <h4 className="mb-3 text-sm font-semibold text-slate-700">Assessment Breakdown</h4>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
               {[
-                ['Assignment', subject.assignment_marks, 10],
-                ['Quiz', subject.quiz_marks, 10],
-                ['Internal', subject.internal_marks, 20],
-                ['Midterm', subject.midterm_marks, 30],
-                ['End Term', subject.endterm_marks, 30],
+                ['Internal', subject.internal_marks, 30],
+                ['Midterm', subject.midterm_marks, 20],
+                ['End Term', subject.endterm_marks, 50],
               ].map(([label, marks, max]) => (
                 <div key={label} className="rounded-lg border border-slate-100 p-3 text-center">
                   <p className="text-xs text-slate-500">{label}</p>
@@ -159,15 +158,18 @@ export default function StudentProfile() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const { activeAcademicYear } = useAppContext();
+
   useEffect(() => {
     async function load() {
+      if (!activeAcademicYear) return;
       setLoading(true);
       setError(null);
       try {
         const studentRes = await studentsAPI.get(id);
         setStudent(studentRes.data);
         try {
-          const analyticsRes = await analyticsAPI.getStudentAnalytics(id);
+          const analyticsRes = await analyticsAPI.getStudentAnalytics(id, { academic_year: activeAcademicYear });
           setAnalytics(analyticsRes.data);
           if (analyticsRes.data.subjects?.length > 0) {
             setExpandedSubject(analyticsRes.data.subjects[0].subject_id);
@@ -183,7 +185,7 @@ export default function StudentProfile() {
       }
     }
     load();
-  }, [id]);
+  }, [id, activeAcademicYear]);
 
   if (loading) return <div className="flex h-64 items-center justify-center"><LoadingSpinner size="lg" /></div>;
   if (error && !student) return <ErrorState message={error} />;

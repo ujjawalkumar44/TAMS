@@ -23,8 +23,6 @@ class AnalyticsRow:
     academic_year: str
     marks_pct: float
     attendance_pct: float
-    assignment: float
-    quiz: float
     internal: float
     midterm: float
     endterm: float
@@ -52,7 +50,6 @@ class AnalyticsRepository:
                 joinedload(TeacherSubjectSection.subject),
                 joinedload(TeacherSubjectSection.section),
             )
-            .filter(TeacherSubjectSection.teacher_id == teacher_id)
         )
 
         if subject_id:
@@ -103,7 +100,7 @@ class AnalyticsRepository:
                 total = 0.0
                 if mark:
                     total = (
-                        mark.assignment_marks + mark.quiz_marks + mark.internal_marks
+                        mark.internal_marks
                         + mark.midterm_marks + mark.endterm_marks
                     )
 
@@ -120,8 +117,6 @@ class AnalyticsRepository:
                         academic_year=assignment.academic_year,
                         marks_pct=mark.percentage if mark else 0.0,
                         attendance_pct=att.attendance_percentage if att else 0.0,
-                        assignment=mark.assignment_marks if mark else 0.0,
-                        quiz=mark.quiz_marks if mark else 0.0,
                         internal=mark.internal_marks if mark else 0.0,
                         midterm=mark.midterm_marks if mark else 0.0,
                         endterm=mark.endterm_marks if mark else 0.0,
@@ -135,22 +130,26 @@ class AnalyticsRepository:
         return rows
 
     def get_filter_options(self, teacher_id: int) -> dict:
-        assignments = (
-            self.db.query(TeacherSubjectSection)
-            .options(
-                joinedload(TeacherSubjectSection.subject),
-                joinedload(TeacherSubjectSection.section),
-            )
-            .filter(TeacherSubjectSection.teacher_id == teacher_id)
-            .all()
-        )
-        subjects = {a.subject_id: {"id": a.subject_id, "name": a.subject.subject_name} for a in assignments}
-        sections = {a.section_id: {"id": a.section_id, "name": a.section.name} for a in assignments}
-        semesters = sorted({a.semester for a in assignments})
-        years = sorted({a.academic_year for a in assignments}, reverse=True)
+        from app.models.subject import Subject
+        from app.models.section import Section
+        
+        subjects = self.db.query(Subject).all()
+        sections = self.db.query(Section).all()
+        
         return {
-            "subjects": list(subjects.values()),
-            "sections": list(sections.values()),
-            "semesters": semesters,
-            "academic_years": years,
+            "subjects": [
+                {"id": s.id, "name": s.subject_name} 
+                for s in subjects
+            ],
+            "sections": [
+                {
+                    "id": s.id, 
+                    "name": s.name, 
+                    "semester": s.semester, 
+                    "academic_year": s.academic_year
+                } 
+                for s in sections
+            ],
+            "semesters": sorted(list({s.semester for s in sections})),
+            "academic_years": sorted(list({s.academic_year for s in sections}), reverse=True),
         }

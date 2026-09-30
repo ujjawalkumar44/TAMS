@@ -24,7 +24,7 @@ export const subjectsAPI = {
 };
 
 export const assignmentsAPI = {
-  list: () => api.get('/assignments'),
+  list: (params) => api.get('/assignments', { params }),
   create: (data) => api.post('/assignments', data),
 };
 

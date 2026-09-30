@@ -7,6 +7,7 @@ import { analyticsAPI, reportsAPI } from '../services';
 import { getErrorMessage } from '../services/api';
 import { usePageTitle } from '../utils/helpers';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
+import { useAppContext } from '../context/AppContext';
 
 const REPORTS = [
   {
@@ -48,11 +49,11 @@ const REPORTS = [
 
 export default function Reports() {
   usePageTitle('Reports');
+  const { activeAcademicYear } = useAppContext();
   const [filters, setFilters] = useState({ subjects: [], sections: [], semesters: [], academic_years: [] });
   const [subjectId, setSubjectId] = useState('');
   const [sectionId, setSectionId] = useState('');
   const [semester, setSemester] = useState('');
-  const [academicYear, setAcademicYear] = useState('');
   const [format, setFormat] = useState('csv');
   const [counts, setCounts] = useState({});
   const [loadingCounts, setLoadingCounts] = useState(true);
@@ -63,13 +64,12 @@ export default function Reports() {
   }, []);
 
   const filterParams = useCallback(() => {
-    const params = {};
+    const params = { academic_year: activeAcademicYear };
     if (subjectId) params.subject_id = subjectId;
     if (sectionId) params.section_id = sectionId;
     if (semester) params.semester = semester;
-    if (academicYear) params.academic_year = academicYear;
     return params;
-  }, [subjectId, sectionId, semester, academicYear]);
+  }, [subjectId, sectionId, semester, activeAcademicYear]);
 
   const loadCounts = useCallback(async () => {
     setLoadingCounts(true);
@@ -108,7 +108,6 @@ export default function Reports() {
     setSubjectId('');
     setSectionId('');
     setSemester('');
-    setAcademicYear('');
   };
 
   return (
@@ -139,7 +138,11 @@ export default function Reports() {
             <label className="label">Section</label>
             <select className="input-field" value={sectionId} onChange={(e) => setSectionId(e.target.value)}>
               <option value="">All Sections</option>
-              {filters.sections.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {filters.sections.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} {s.semester ? `(Sem ${s.semester}, ${s.academic_year})` : ''}
+                </option>
+              ))}
             </select>
           </div>
           <div>
@@ -149,14 +152,7 @@ export default function Reports() {
               {filters.semesters.map((s) => <option key={s} value={s}>Semester {s}</option>)}
             </select>
           </div>
-          <div>
-            <label className="label">Academic Year</label>
-            <select className="input-field" value={academicYear} onChange={(e) => setAcademicYear(e.target.value)}>
-              <option value="">All Years</option>
-              {filters.academic_years.map((y) => <option key={y} value={y}>{y}</option>)}
-            </select>
-          </div>
-          <div className="flex items-end">
+          <div className="flex items-end lg:col-span-2">
             <button type="button" onClick={clearFilters} className="btn-secondary w-full">Clear Filters</button>
           </div>
         </div>

@@ -91,8 +91,9 @@ class StudentRepository:
             .all()
         )
 
-    def create(self, data: StudentCreate) -> Student:
-        student = Student(**data.model_dump())
+    def create(self, data: StudentCreate | dict) -> Student:
+        payload = data if isinstance(data, dict) else data.model_dump()
+        student = Student(**payload)
         self.db.add(student)
         self.db.commit()
         self.db.refresh(student)
@@ -118,12 +119,11 @@ class AssignmentRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def list_by_teacher(self, teacher_id: int) -> list[TeacherSubjectSection]:
-        return (
-            self.db.query(TeacherSubjectSection)
-            .filter(TeacherSubjectSection.teacher_id == teacher_id)
-            .all()
-        )
+    def list_by_teacher(self, teacher_id: int, academic_year: str | None = None) -> list[TeacherSubjectSection]:
+        q = self.db.query(TeacherSubjectSection).filter(TeacherSubjectSection.teacher_id == teacher_id)
+        if academic_year:
+            q = q.filter(TeacherSubjectSection.academic_year == academic_year)
+        return q.all()
 
     def create(self, assignment: TeacherSubjectSection) -> TeacherSubjectSection:
         self.db.add(assignment)

@@ -78,10 +78,22 @@ class StudentService:
         return _to_response(student)
 
     def create_student(self, data: StudentCreate) -> StudentResponse:
-        if not self.section_repo.get_by_id(data.section_id):
+        section = self.section_repo.get_by_id(data.section_id)
+        if not section:
             raise HTTPException(status_code=400, detail="Invalid section_id")
+        
+        # Override student semester and academic_year to match chosen section
+        data.semester = section.semester
+        data.academic_year = section.academic_year
+
         self._validate_uniqueness(data)
-        student = self.repo.create(data)
+
+        payload = data.model_dump()
+        payload["semester"] = section.semester
+        payload["academic_year"] = section.academic_year
+        print("DEBUG PAYLOAD:", payload)
+
+        student = self.repo.create(payload)
         self.enrollment_repo.enroll_student_in_section_subjects(
             student.id, data.section_id, data.academic_year
         )
@@ -92,6 +104,16 @@ class StudentService:
         student = self.repo.get_by_id(student_id)
         if not student:
             raise HTTPException(status_code=404, detail="Student not found")
+        
+        target_section_id = data.section_id if data.section_id is not None else student.section_id
+        section = self.section_repo.get_by_id(target_section_id)
+        if not section:
+            raise HTTPException(status_code=400, detail="Invalid section_id")
+        
+        # Sync semester and academic_year with section
+        data.semester = section.semester
+        data.academic_year = section.academic_year
+
         self._validate_uniqueness(data, exclude_id=student_id)
         old_section = student.section_id
         updated = self.repo.update(student, data)
@@ -111,7 +133,16 @@ class StudentService:
     def get_filter_options(self) -> dict:
         sections = self.section_repo.list_all()
         return {
-            "sections": [{"id": s.id, "name": s.name} for s in sections],
+            "sections": [
+                {
+                    "id": s.id,
+                    "name": s.name,
+                    "semester": s.semester,
+                    "academic_year": s.academic_year,
+                    "branch": s.branch,
+                }
+                for s in sections
+            ],
             "semesters": sorted({s.semester for s in sections}),
             "academic_years": sorted({s.academic_year for s in sections}, reverse=True),
         }

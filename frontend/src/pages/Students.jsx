@@ -8,7 +8,7 @@ import { usePageTitle } from '../utils/helpers';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import Modal from '../components/ui/Modal';
 import { EmptyState, ErrorState } from '../components/ui/EmptyState';
-
+import { useAppContext } from '../context/AppContext';
 export default function Students() {
   usePageTitle('Students');
   const navigate = useNavigate();
@@ -24,11 +24,14 @@ export default function Students() {
   const [deleteModal, setDeleteModal] = useState({ open: false, student: null });
   const [deleting, setDeleting] = useState(false);
 
+  const { activeAcademicYear } = useAppContext();
+
   const fetchStudents = useCallback(async () => {
+    if (!activeAcademicYear) return;
     setLoading(true);
     setError(null);
     try {
-      const params = { page, page_size: 10 };
+      const params = { page, page_size: 10, academic_year: activeAcademicYear };
       if (search) params.search = search;
       if (sectionId) params.section_id = sectionId;
       if (semester) params.semester = semester;
@@ -40,7 +43,7 @@ export default function Students() {
     } finally {
       setLoading(false);
     }
-  }, [search, sectionId, semester, page]);
+  }, [search, sectionId, semester, page, activeAcademicYear]);
 
   useEffect(() => {
     studentsAPI.getFilters().then((res) => setFilters(res.data)).catch(() => {});
@@ -82,7 +85,11 @@ export default function Students() {
           </div>
           <select value={sectionId} onChange={(e) => { setSectionId(e.target.value); setPage(1); }} className="input-field">
             <option value="">All Sections</option>
-            {filters.sections.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            {filters.sections.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name} {s.semester ? `(Sem ${s.semester}, ${s.academic_year})` : ''}
+              </option>
+            ))}
           </select>
           <select value={semester} onChange={(e) => { setSemester(e.target.value); setPage(1); }} className="input-field">
             <option value="">All Semesters</option>
@@ -96,10 +103,10 @@ export default function Students() {
           : error ? <ErrorState message={error} onRetry={fetchStudents} />
           : students.length === 0 ? <EmptyState title="No students found" />
           : (
-            <>
-              <div className="overflow-x-auto">
+            <div className="card overflow-hidden p-0 glass-panel">
+              <div className="table-container border-0 rounded-none shadow-none">
                 <table className="w-full text-left text-sm">
-                  <thead className="border-b bg-slate-50">
+                  <thead className="table-header">
                     <tr>
                       <th className="px-4 py-3 font-medium text-slate-600">Roll No.</th>
                       <th className="px-4 py-3 font-medium text-slate-600">Name</th>
@@ -110,18 +117,18 @@ export default function Students() {
                     </tr>
                   </thead>
                   <tbody>
-                    {students.map((s) => (
-                      <tr key={s.id} className="border-b border-slate-100 hover:bg-slate-50">
-                        <td className="px-4 py-3 font-medium text-primary-600">{s.roll_number}</td>
-                        <td className="px-4 py-3 font-medium">{s.name}</td>
-                        <td className="px-4 py-3">{s.section_name}</td>
-                        <td className="px-4 py-3">Sem {s.semester}</td>
-                        <td className="px-4 py-3 text-slate-600">{s.email}</td>
+                    {students.map((student) => (
+                      <tr key={student.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors cursor-pointer" onClick={() => navigate(`/students/${student.id}`)}>
+                        <td className="px-4 py-3 font-medium text-primary-600">{student.roll_number}</td>
+                        <td className="px-4 py-3 font-medium">{student.name}</td>
+                        <td className="px-4 py-3">{student.section_name}</td>
+                        <td className="px-4 py-3">Sem {student.semester}</td>
+                        <td className="px-4 py-3 text-slate-600">{student.email}</td>
                         <td className="px-4 py-3">
                           <div className="flex gap-1">
-                            <button onClick={() => navigate(`/students/${s.id}`)} className="rounded p-1.5 text-slate-500 hover:bg-blue-50 hover:text-blue-600"><Eye className="h-4 w-4" /></button>
-                            <button onClick={() => navigate(`/students/${s.id}/edit`)} className="rounded p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-600"><Pencil className="h-4 w-4" /></button>
-                            <button onClick={() => setDeleteModal({ open: true, student: s })} className="rounded p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
+                            <button onClick={(e) => { e.stopPropagation(); navigate(`/students/${student.id}`) }} className="rounded p-1.5 text-slate-500 hover:bg-blue-50 hover:text-blue-600"><Eye className="h-4 w-4" /></button>
+                            <button onClick={(e) => { e.stopPropagation(); navigate(`/students/${student.id}/edit`) }} className="rounded p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-600"><Pencil className="h-4 w-4" /></button>
+                            <button onClick={(e) => { e.stopPropagation(); setDeleteModal({ open: true, student: student }) }} className="rounded p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
                           </div>
                         </td>
                       </tr>
@@ -136,7 +143,7 @@ export default function Students() {
                   <button onClick={() => setPage((p) => Math.min(pagination.total_pages, p + 1))} disabled={page >= pagination.total_pages} className="btn-secondary !px-3 !py-1.5"><ChevronRight className="h-4 w-4" /></button>
                 </div>
               </div>
-            </>
+            </div>
           )}
       </div>
 

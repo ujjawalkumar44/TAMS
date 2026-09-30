@@ -23,10 +23,8 @@ RISK_POINTS_POOR_ASSESSMENT = 15       # avg of quiz/assignment/internal < 50
 RISK_POINTS_DECLINING = 10             # latest assessment dropped > 15%
 
 # Assessment max marks (for validation)
-MAX_ASSIGNMENT = 20
-MAX_QUIZ = 20
-MAX_INTERNAL = 20
-MAX_MIDTERM = 50
-MAX_ENDTERM = 100
+MAX_INTERNAL = 30
+MAX_MIDTERM = 20
+MAX_ENDTERM = 50
 
 DECLINE_THRESHOLD = 15  # % drop to flag declining performance

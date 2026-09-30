@@ -12,10 +12,11 @@ router = APIRouter(prefix="/assignments", tags=["Teacher Assignments"])
 
 @router.get("", response_model=list[AssignmentResponse])
 def list_assignments(
+    academic_year: str | None = None,
     db: Session = Depends(get_db),
     teacher: Teacher = Depends(get_current_teacher),
 ):
-    return AssignmentService(db).list_assignments(teacher.id)
+    return AssignmentService(db).list_assignments(teacher.id, academic_year)
 
 
 @router.post("", response_model=AssignmentResponse, status_code=status.HTTP_201_CREATED)

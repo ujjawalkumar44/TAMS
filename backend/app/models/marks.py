@@ -36,10 +36,14 @@ class MarkRecord(Base):
 
     @staticmethod
     def compute_totals(
-        assignment: float, quiz: float, internal: float, midterm: float, endterm: float,
-        max_assignment=20, max_quiz=20, max_internal=20, max_midterm=50, max_endterm=100,
+        internal: float, midterm: float, endterm: float,
+        max_internal=30, max_midterm=20, max_endterm=50,
     ) -> tuple[float, float]:
-        total_obtained = assignment + quiz + internal + midterm + endterm
-        total_max = max_assignment + max_quiz + max_internal + max_midterm + max_endterm
-        percentage = round((total_obtained / total_max) * 100, 1) if total_max > 0 else 0.0
-        return round(total_obtained, 1), percentage
+        total_obtained = internal + midterm + endterm
+        total_max = max_internal + max_midterm + max_endterm
+
+        if total_max == 0:
+            return 0.0, 0.0
+
+        percentage = (total_obtained / total_max) * 100
+        return round(total_obtained, 2), round(percentage, 2)

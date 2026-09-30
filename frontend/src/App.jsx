@@ -15,7 +15,7 @@ import Marks from './pages/Marks';
 import AtRiskStudents from './pages/AtRiskStudents';
 import Reports from './pages/Reports';
 import SettingsPage from './pages/Settings';
-
+import Profile from './pages/Profile';
 export default function App() {
   return (
     <Routes>
@@ -35,6 +35,7 @@ export default function App() {
           <Route path="/at-risk" element={<AtRiskStudents />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/profile" element={<Profile />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

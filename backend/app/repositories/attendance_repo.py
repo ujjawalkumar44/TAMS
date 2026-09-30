@@ -21,17 +21,34 @@ class AttendanceRepository:
         self.db = db
 
     def get_enrolled_students(self, subject_id: int, section_id: int) -> list[Student]:
-        return (
+        students = (
             self.db.query(Student)
-            .join(Enrollment, Enrollment.student_id == Student.id)
-            .filter(
-                Enrollment.subject_id == subject_id,
-                Enrollment.section_id == section_id,
-                Student.section_id == section_id,
-            )
+            .filter(Student.section_id == section_id)
             .order_by(Student.roll_number)
             .all()
         )
+        for s in students:
+            exists = (
+                self.db.query(Enrollment)
+                .filter(
+                    Enrollment.student_id == s.id,
+                    Enrollment.subject_id == subject_id,
+                    Enrollment.section_id == section_id,
+                )
+                .first()
+            )
+            if not exists:
+                self.db.add(
+                    Enrollment(
+                        student_id=s.id,
+                        subject_id=subject_id,
+                        section_id=section_id,
+                        academic_year=s.academic_year,
+                    )
+                )
+        if students:
+            self.db.commit()
+        return students
 
     def get_session(
         self, student_id: int, subject_id: int, section_id: int, att_date: date

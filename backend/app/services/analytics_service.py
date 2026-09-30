@@ -39,8 +39,6 @@ class AnalyticsService:
         score, level, reasons, trend = calculate_risk(
             row.marks_pct,
             row.attendance_pct,
-            row.assignment,
-            row.quiz,
             row.internal,
             row.midterm,
             row.endterm,
@@ -73,15 +71,13 @@ class AnalyticsService:
         trend_data = [
             TrendPoint(assessment=name, percentage=pct)
             for name, pct in get_assessment_series(
-                row.assignment, row.quiz, row.internal, row.midterm, row.endterm
+                row.internal, row.midterm, row.endterm
             )
         ]
         return SubjectPerformance(
             subject_id=row.subject_id,
             subject_name=row.subject_name,
             section_name=row.section_name,
-            assignment_marks=row.assignment,
-            quiz_marks=row.quiz,
             internal_marks=row.internal,
             midterm_marks=row.midterm,
             endterm_marks=row.endterm,
@@ -138,10 +134,42 @@ class AnalyticsService:
         attention.sort(key=lambda x: (-x.risk_score, x.marks, x.attendance))
         attention = attention[:10]
 
+        from app.models.student import Student
+        from app.models.section import Section
+        from app.models.subject import Subject
+        from app.models.enrollment import Enrollment
+        from app.models.teacher_subject_section import TeacherSubjectSection
+
+        # Calculate exact entity counts matching the filters for the Dashboard KPIs
+        # This fixes the bug where newly created sections/students showed 0 because they had no assignments yet.
+        
+        # Students count
+        sq = self.repo.db.query(Student)
+        if section_id: sq = sq.filter(Student.section_id == section_id)
+        if semester: sq = sq.filter(Student.semester == semester)
+        if academic_year: sq = sq.filter(Student.academic_year == academic_year)
+        if subject_id: sq = sq.join(Enrollment).filter(Enrollment.subject_id == subject_id)
+        
+        # Sections count
+        sec_q = self.repo.db.query(Section)
+        if section_id: sec_q = sec_q.filter(Section.id == section_id)
+        if semester: sec_q = sec_q.filter(Section.semester == semester)
+        if academic_year: sec_q = sec_q.filter(Section.academic_year == academic_year)
+
+        # Subjects count
+        sub_q = self.repo.db.query(Subject)
+        if subject_id: sub_q = sub_q.filter(Subject.id == subject_id)
+        if semester: sub_q = sub_q.filter(Subject.semester == semester)
+        if section_id or academic_year:
+            # If section or academic year is specified, we must join assignments to see what subjects are taught there
+            sub_q = sub_q.join(TeacherSubjectSection, TeacherSubjectSection.subject_id == Subject.id)
+            if section_id: sub_q = sub_q.filter(TeacherSubjectSection.section_id == section_id)
+            if academic_year: sub_q = sub_q.filter(TeacherSubjectSection.academic_year == academic_year)
+
         stats = DashboardStats(
-            total_students=len(unique_students),
-            sections=len(unique_sections),
-            subjects=len(unique_subjects),
+            total_students=sq.count(),
+            sections=sec_q.count(),
+            subjects=sub_q.count(),
             average_marks=avg_marks,
             average_attendance=avg_att,
             students_at_risk=at_risk_count,
@@ -311,8 +339,9 @@ class AnalyticsService:
         teacher_id: int,
         student_id: int,
         subject_id: Optional[int] = None,
+        academic_year: Optional[str] = None,
     ) -> StudentAnalyticsResponse:
-        rows = self.repo.get_teacher_rows(teacher_id, subject_id=subject_id)
+        rows = self.repo.get_teacher_rows(teacher_id, subject_id=subject_id, academic_year=academic_year)
         student_rows = [r for r in rows if r.student_id == student_id]
 
         if not student_rows:

@@ -28,10 +28,24 @@ class MarksService:
     def _verify_teacher_assignment(self, teacher_id: int, subject_id: int, section_id: int):
         assignments = self.assignment_repo.list_by_teacher(teacher_id)
         if not any(a.subject_id == subject_id and a.section_id == section_id for a in assignments):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You are not assigned to teach this subject in this section",
+            from app.models.teacher_subject_section import TeacherSubjectSection
+            from app.repositories.student_repo import EnrollmentRepository
+
+            section = self.section_repo.get_by_id(section_id)
+            if not section:
+                raise HTTPException(status_code=400, detail="Section not found")
+
+            assignment = TeacherSubjectSection(
+                teacher_id=teacher_id,
+                subject_id=subject_id,
+                section_id=section_id,
+                academic_year=section.academic_year,
+                semester=section.semester,
             )
+            self.assignment_repo.create(assignment)
+
+            enroll_repo = EnrollmentRepository(self.db)
+            enroll_repo.enroll_section_students(section_id, subject_id, section.academic_year)
 
     def _validate_marks(self, field: str, value: float):
         field_to_max = {v[0]: v[1] for v in ASSESSMENT_FIELD_MAP.values()}
@@ -65,8 +79,6 @@ class MarksService:
                     roll_number=student.roll_number,
                     name=student.name,
                     mark_record_id=record.id if record else None,
-                    assignment_marks=record.assignment_marks if record else 0,
-                    quiz_marks=record.quiz_marks if record else 0,
                     internal_marks=record.internal_marks if record else 0,
                     midterm_marks=record.midterm_marks if record else 0,
                     endterm_marks=record.endterm_marks if record else 0,
@@ -101,32 +113,22 @@ class MarksService:
                         detail=f"{data.assessment_type.title()} marks cannot exceed {max_val}",
                     )
 
-                assignment = existing.assignment_marks if existing else 0
-                quiz = existing.quiz_marks if existing else 0
                 internal = existing.internal_marks if existing else 0
                 midterm = existing.midterm_marks if existing else 0
                 endterm = existing.endterm_marks if existing else 0
 
-                if field_name == "assignment_marks":
-                    assignment = entry.marks
-                elif field_name == "quiz_marks":
-                    quiz = entry.marks
-                elif field_name == "internal_marks":
+                if field_name == "internal_marks":
                     internal = entry.marks
                 elif field_name == "midterm_marks":
                     midterm = entry.marks
                 elif field_name == "endterm_marks":
                     endterm = entry.marks
             else:
-                assignment = entry.assignment_marks if entry.assignment_marks is not None else (existing.assignment_marks if existing else 0)
-                quiz = entry.quiz_marks if entry.quiz_marks is not None else (existing.quiz_marks if existing else 0)
                 internal = entry.internal_marks if entry.internal_marks is not None else (existing.internal_marks if existing else 0)
                 midterm = entry.midterm_marks if entry.midterm_marks is not None else (existing.midterm_marks if existing else 0)
                 endterm = entry.endterm_marks if entry.endterm_marks is not None else (existing.endterm_marks if existing else 0)
 
                 for fname, val in [
-                    ("assignment_marks", assignment),
-                    ("quiz_marks", quiz),
                     ("internal_marks", internal),
                     ("midterm_marks", midterm),
                     ("endterm_marks", endterm),
@@ -138,8 +140,6 @@ class MarksService:
                 subject_id=data.subject_id,
                 section_id=data.section_id,
                 teacher_id=teacher_id,
-                assignment=assignment,
-                quiz=quiz,
                 internal=internal,
                 midterm=midterm,
                 endterm=endterm,
@@ -156,15 +156,11 @@ class MarksService:
 
         self._verify_teacher_assignment(teacher_id, record.subject_id, record.section_id)
 
-        assignment = data.assignment_marks if data.assignment_marks is not None else record.assignment_marks
-        quiz = data.quiz_marks if data.quiz_marks is not None else record.quiz_marks
         internal = data.internal_marks if data.internal_marks is not None else record.internal_marks
         midterm = data.midterm_marks if data.midterm_marks is not None else record.midterm_marks
         endterm = data.endterm_marks if data.endterm_marks is not None else record.endterm_marks
 
         for fname, val in [
-            ("assignment_marks", assignment),
-            ("quiz_marks", quiz),
             ("internal_marks", internal),
             ("midterm_marks", midterm),
             ("endterm_marks", endterm),
@@ -176,8 +172,6 @@ class MarksService:
             subject_id=record.subject_id,
             section_id=record.section_id,
             teacher_id=teacher_id,
-            assignment=assignment,
-            quiz=quiz,
             internal=internal,
             midterm=midterm,
             endterm=endterm,

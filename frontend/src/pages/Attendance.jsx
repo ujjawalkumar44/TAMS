@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Save, RefreshCw, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { assignmentsAPI, attendanceAPI } from '../services';
+import { assignmentsAPI, attendanceAPI, sectionsAPI, subjectsAPI } from '../services';
 import { getErrorMessage } from '../services/api';
 import { usePageTitle } from '../utils/helpers';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { EmptyState, ErrorState } from '../components/ui/EmptyState';
+import { useAppContext } from '../context/AppContext';
 
 const today = () => new Date().toISOString().split('T')[0];
 
@@ -30,6 +31,8 @@ function AlertBadge({ level, label }) {
 export default function Attendance() {
   usePageTitle('Attendance');
   const [assignments, setAssignments] = useState([]);
+  const [allSections, setAllSections] = useState([]);
+  const [allSubjects, setAllSubjects] = useState([]);
   const [subjectId, setSubjectId] = useState('');
   const [sectionId, setSectionId] = useState('');
   const [attDate, setAttDate] = useState(today());
@@ -40,23 +43,46 @@ export default function Attendance() {
   const [error, setError] = useState(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
+  const { activeAcademicYear } = useAppContext();
+
   useEffect(() => {
-    assignmentsAPI.list().then((res) => setAssignments(res.data)).catch(() => {});
-  }, []);
+    if (activeAcademicYear) {
+      assignmentsAPI.list({ academic_year: activeAcademicYear }).then((res) => setAssignments(res.data)).catch(() => {});
+      sectionsAPI.list({ academic_year: activeAcademicYear }).then((res) => setAllSections(res.data)).catch(() => {});
+      subjectsAPI.list().then((res) => setAllSubjects(res.data)).catch(() => {});
+    }
+  }, [activeAcademicYear]);
 
   const subjectOptions = useMemo(() => {
     const map = new Map();
-    assignments.forEach((a) => map.set(a.subject_id, { id: a.subject_id, name: a.subject_name, code: a.subject_code }));
+    assignments.forEach((a) => map.set(a.subject_id, { id: a.subject_id, name: a.subject_name, code: a.subject_code, semester: a.semester }));
+    allSubjects.forEach((s) => {
+      if (!map.has(s.id)) {
+        map.set(s.id, { id: s.id, name: s.subject_name, code: s.subject_code, semester: s.semester });
+      }
+    });
     return Array.from(map.values());
-  }, [assignments]);
+  }, [assignments, allSubjects]);
 
   const sectionOptions = useMemo(() => {
     if (!subjectId) return [];
+    const selectedSub = subjectOptions.find(s => String(s.id) === String(subjectId));
     const map = new Map();
-    assignments.filter((a) => a.subject_id === +subjectId)
+    
+    // First, assigned sections
+    assignments.filter((a) => String(a.subject_id) === String(subjectId))
       .forEach((a) => map.set(a.section_id, { id: a.section_id, name: a.section_name }));
+      
+    // Next, all sections in academic year (matching semester if available)
+    allSections.forEach((sec) => {
+      if (!selectedSub || !selectedSub.semester || sec.semester === selectedSub.semester) {
+        if (!map.has(sec.id)) {
+          map.set(sec.id, { id: sec.id, name: sec.name });
+        }
+      }
+    });
     return Array.from(map.values());
-  }, [assignments, subjectId]);
+  }, [assignments, allSections, subjectId, subjectOptions]);
 
   const loadSheet = useCallback(async () => {
     if (!subjectId || !sectionId || !attDate) return;
@@ -206,10 +232,10 @@ export default function Attendance() {
       ) : entries.length === 0 ? (
         <EmptyState title="No enrolled students" />
       ) : (
-        <div className="card overflow-hidden p-0">
-          <div className="overflow-x-auto">
+        <div className="card overflow-hidden p-0 glass-panel">
+          <div className="table-container border-0 rounded-none shadow-none">
             <table className="w-full text-left text-sm">
-              <thead className="border-b bg-slate-50">
+              <thead className="table-header">
                 <tr>
                   <th className="px-4 py-3 font-medium text-slate-600">Roll No.</th>
                   <th className="px-4 py-3 font-medium text-slate-600">Student</th>
@@ -221,12 +247,12 @@ export default function Attendance() {
                   <th className="px-4 py-3 font-medium text-slate-600">Alert</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-100">
                 {entries.map((entry) => (
-                  <tr key={entry.student_id} className="border-b border-slate-100 hover:bg-slate-50">
-                    <td className="px-4 py-3 font-medium">{entry.roll_number}</td>
-                    <td className="px-4 py-3 font-medium">{entry.name}</td>
-                    <td className="px-4 py-3">
+                  <tr key={entry.student_id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
+                    <td className="px-4 py-3 font-medium text-slate-700">{entry.roll_number}</td>
+                    <td className="px-4 py-3 font-medium text-slate-900">{entry.name}</td>
+                    <td className="px-6 py-4">
                       <div className="flex gap-1">
                         <button
                           onClick={() => setStatus(entry.student_id, 'present')}

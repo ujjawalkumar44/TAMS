@@ -68,8 +68,6 @@ class SubjectPerformance(BaseModel):
     subject_id: int
     subject_name: str
     section_name: str
-    assignment_marks: float
-    quiz_marks: float
     internal_marks: float
     midterm_marks: float
     endterm_marks: float

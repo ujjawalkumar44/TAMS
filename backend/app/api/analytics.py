@@ -52,7 +52,8 @@ def get_at_risk_students(
 def get_student_analytics(
     student_id: int,
     subject_id: Optional[int] = Query(None),
+    academic_year: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     teacher: Teacher = Depends(get_current_teacher),
 ):
-    return AnalyticsService(db).get_student_analytics(teacher.id, student_id, subject_id)
+    return AnalyticsService(db).get_student_analytics(teacher.id, student_id, subject_id, academic_year)

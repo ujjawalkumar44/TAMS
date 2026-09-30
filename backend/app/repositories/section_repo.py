@@ -22,6 +22,17 @@ class SectionRepository:
     def get_by_name(self, name: str) -> Section | None:
         return self.db.query(Section).filter(Section.name == name).first()
 
+    def get_by_details(self, name: str, semester: int, academic_year: str, branch: str, exclude_id: int | None = None) -> Section | None:
+        query = self.db.query(Section).filter(
+            Section.name == name,
+            Section.semester == semester,
+            Section.academic_year == academic_year,
+            Section.branch == branch,
+        )
+        if exclude_id:
+            query = query.filter(Section.id != exclude_id)
+        return query.first()
+
     def create(self, data: SectionCreate) -> Section:
         section = Section(**data.model_dump())
         self.db.add(section)

@@ -1,15 +1,14 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Save, RefreshCw, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { assignmentsAPI, marksAPI } from '../services';
+import { assignmentsAPI, marksAPI, sectionsAPI, subjectsAPI } from '../services';
 import { getErrorMessage } from '../services/api';
 import { usePageTitle } from '../utils/helpers';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { EmptyState, ErrorState } from '../components/ui/EmptyState';
+import { useAppContext } from '../context/AppContext';
 
 const ASSESSMENT_TYPES = [
-  { key: 'assignment', label: 'Assignment', field: 'assignment_marks', maxKey: 'assignment' },
-  { key: 'quiz', label: 'Quiz', field: 'quiz_marks', maxKey: 'quiz' },
   { key: 'internal', label: 'Internal', field: 'internal_marks', maxKey: 'internal' },
   { key: 'midterm', label: 'Midterm', field: 'midterm_marks', maxKey: 'midterm' },
   { key: 'endterm', label: 'End Term', field: 'endterm_marks', maxKey: 'endterm' },
@@ -17,18 +16,18 @@ const ASSESSMENT_TYPES = [
 
 function computeTotals(entry, maxMarks) {
   const total =
-    (+entry.assignment_marks || 0) +
-    (+entry.quiz_marks || 0) +
     (+entry.internal_marks || 0) +
     (+entry.midterm_marks || 0) +
     (+entry.endterm_marks || 0);
-  const maxTotal = maxMarks?.total || 210;
+  const maxTotal = maxMarks?.total || 100;
   return { total: Math.round(total * 10) / 10, percentage: maxTotal ? Math.round((total / maxTotal) * 1000) / 10 : 0 };
 }
 
 export default function Marks() {
   usePageTitle('Marks / Results');
   const [assignments, setAssignments] = useState([]);
+  const [allSections, setAllSections] = useState([]);
+  const [allSubjects, setAllSubjects] = useState([]);
   const [subjectId, setSubjectId] = useState('');
   const [sectionId, setSectionId] = useState('');
   const [assessmentType, setAssessmentType] = useState('all');
@@ -39,24 +38,47 @@ export default function Marks() {
   const [error, setError] = useState(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
+  const { activeAcademicYear } = useAppContext();
+
   useEffect(() => {
-    assignmentsAPI.list().then((res) => setAssignments(res.data)).catch(() => {});
-  }, []);
+    if (activeAcademicYear) {
+      assignmentsAPI.list({ academic_year: activeAcademicYear }).then((res) => setAssignments(res.data)).catch(() => {});
+      sectionsAPI.list({ academic_year: activeAcademicYear }).then((res) => setAllSections(res.data)).catch(() => {});
+      subjectsAPI.list().then((res) => setAllSubjects(res.data)).catch(() => {});
+    }
+  }, [activeAcademicYear]);
 
   const subjectOptions = useMemo(() => {
     const map = new Map();
-    assignments.forEach((a) => map.set(a.subject_id, { id: a.subject_id, name: a.subject_name, code: a.subject_code }));
+    assignments.forEach((a) => map.set(a.subject_id, { id: a.subject_id, name: a.subject_name, code: a.subject_code, semester: a.semester }));
+    allSubjects.forEach((s) => {
+      if (!map.has(s.id)) {
+        map.set(s.id, { id: s.id, name: s.subject_name, code: s.subject_code, semester: s.semester });
+      }
+    });
     return Array.from(map.values());
-  }, [assignments]);
+  }, [assignments, allSubjects]);
 
   const sectionOptions = useMemo(() => {
     if (!subjectId) return [];
+    const selectedSub = subjectOptions.find(s => String(s.id) === String(subjectId));
     const map = new Map();
+    
+    // First, assigned sections
     assignments
-      .filter((a) => a.subject_id === +subjectId)
+      .filter((a) => String(a.subject_id) === String(subjectId))
       .forEach((a) => map.set(a.section_id, { id: a.section_id, name: a.section_name }));
+
+    // Next, all sections in academic year (matching semester if available)
+    allSections.forEach((sec) => {
+      if (!selectedSub || !selectedSub.semester || sec.semester === selectedSub.semester) {
+        if (!map.has(sec.id)) {
+          map.set(sec.id, { id: sec.id, name: sec.name });
+        }
+      }
+    });
     return Array.from(map.values());
-  }, [assignments, subjectId]);
+  }, [assignments, allSections, subjectId, subjectOptions]);
 
   const loadSheet = useCallback(async () => {
     if (!subjectId || !sectionId) return;
@@ -128,8 +150,6 @@ export default function Marks() {
           section_id: +sectionId,
           entries: entries.map((e) => ({
             student_id: e.student_id,
-            assignment_marks: +e.assignment_marks || 0,
-            quiz_marks: +e.quiz_marks || 0,
             internal_marks: +e.internal_marks || 0,
             midterm_marks: +e.midterm_marks || 0,
             endterm_marks: +e.endterm_marks || 0,
@@ -219,35 +239,35 @@ export default function Marks() {
       ) : entries.length === 0 ? (
         <EmptyState title="No enrolled students" message="No students are enrolled in this subject/section." />
       ) : (
-        <div className="card overflow-hidden p-0">
-          <div className="overflow-x-auto">
+        <div className="card overflow-hidden p-0 glass-panel">
+          <div className="table-container border-0 rounded-none shadow-none">
             <table className="w-full text-left text-sm">
-              <thead className="border-b bg-slate-50">
+              <thead className="table-header">
                 <tr>
-                  <th className="px-3 py-3 font-medium text-slate-600">Roll No.</th>
-                  <th className="px-3 py-3 font-medium text-slate-600">Student</th>
+                  <th className="px-4 py-3 font-medium text-slate-600">Roll No.</th>
+                  <th className="px-4 py-3 font-medium text-slate-600">Student</th>
                   {ASSESSMENT_TYPES.map((a) => (
                     <th
                       key={a.key}
-                      className={`px-3 py-3 font-medium text-slate-600 ${
-                        assessmentType === a.key ? 'bg-purple-50 text-purple-700' : ''
+                      className={`px-4 py-3 font-medium text-slate-600 ${
+                        assessmentType === a.key ? 'bg-primary-50 text-primary-700' : ''
                       }`}
                     >
                       {a.label}
                       <span className="block text-xs font-normal text-slate-400">/{sheet.max_marks[a.maxKey]}</span>
                     </th>
                   ))}
-                  <th className="px-3 py-3 font-medium text-slate-600">Total</th>
-                  <th className="px-3 py-3 font-medium text-slate-600">%</th>
+                  <th className="px-4 py-3 font-medium text-slate-600">Total</th>
+                  <th className="px-4 py-3 font-medium text-slate-600">%</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-100">
                 {entries.map((entry) => {
                   const { total, percentage } = computeTotals(entry, sheet.max_marks);
                   return (
-                    <tr key={entry.student_id} className="border-b border-slate-100 hover:bg-slate-50">
-                      <td className="px-3 py-2 font-medium text-slate-700">{entry.roll_number}</td>
-                      <td className="px-3 py-2 font-medium">{entry.name}</td>
+                    <tr key={entry.student_id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
+                      <td className="px-4 py-3 font-medium text-slate-700">{entry.roll_number}</td>
+                      <td className="px-4 py-3 font-medium text-slate-900">{entry.name}</td>
                       {ASSESSMENT_TYPES.map((a) => {
                         const isActive = assessmentType === 'all' || assessmentType === a.key;
                         const isHighlight = assessmentType === a.key;

@@ -59,39 +59,41 @@ export default function Subjects() {
         </button>
       </div>
 
-      <div className="card overflow-hidden p-0">
+      <div className="card overflow-hidden p-0 glass-panel">
         {loading ? <div className="flex h-48 items-center justify-center"><LoadingSpinner /></div>
-          : error ? <ErrorState message={error} onRetry={fetchSubjects} />
-          : subjects.length === 0 ? <EmptyState title="No subjects" message="Create subjects you teach." />
-          : (
+        : error ? <ErrorState message={error} onRetry={fetchSubjects} />
+        : subjects.length === 0 ? <EmptyState title="No subjects" message="Create your first subject to get started." />
+        : (
+          <div className="table-container border-0 rounded-none shadow-none">
             <table className="w-full text-left text-sm">
-              <thead className="border-b bg-slate-50">
+              <thead className="table-header">
                 <tr>
                   <th className="px-4 py-3 font-medium text-slate-600">Code</th>
-                  <th className="px-4 py-3 font-medium text-slate-600">Subject Name</th>
+                  <th className="px-4 py-3 font-medium text-slate-600">Name</th>
                   <th className="px-4 py-3 font-medium text-slate-600">Credits</th>
                   <th className="px-4 py-3 font-medium text-slate-600">Semester</th>
                   <th className="px-4 py-3 font-medium text-slate-600">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {subjects.map((s) => (
-                  <tr key={s.id} className="border-b border-slate-100 hover:bg-slate-50">
-                    <td className="px-4 py-3 font-medium text-primary-600">{s.subject_code}</td>
-                    <td className="px-4 py-3 font-medium">{s.subject_name}</td>
-                    <td className="px-4 py-3">{s.credits}</td>
-                    <td className="px-4 py-3">Sem {s.semester}</td>
+                {subjects.map((subject) => (
+                  <tr key={subject.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
+                    <td className="px-4 py-3 font-medium text-primary-600">{subject.subject_code}</td>
+                    <td className="px-4 py-3 font-medium text-slate-800">{subject.subject_name}</td>
+                    <td className="px-4 py-3 text-slate-700">{subject.credits}</td>
+                    <td className="px-4 py-3 text-slate-700">Sem {subject.semester}</td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1">
-                        <button onClick={() => { setForm(s); setModal({ open: true, editing: s }); }} className="rounded p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-600"><Pencil className="h-4 w-4" /></button>
-                        <button onClick={async () => { if (confirm('Delete?')) { await subjectsAPI.delete(s.id); fetchSubjects(); } }} className="rounded p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
+                        <button onClick={() => { setForm(subject); setModal({ open: true, editing: subject }); }} className="rounded p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-600"><Pencil className="h-4 w-4" /></button>
+                        <button onClick={async () => { if (confirm('Delete?')) { await subjectsAPI.delete(subject.id); fetchSubjects(); } }} className="rounded p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
                       </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          )}
+          </div>
+        )}
       </div>
 
       <Modal isOpen={modal.open} onClose={() => setModal({ open: false, editing: null })} title={modal.editing ? 'Edit Subject' : 'Add Subject'}>

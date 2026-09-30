@@ -7,6 +7,7 @@ import { getErrorMessage } from '../services/api';
 import { usePageTitle, RISK_COLORS, TREND_COLORS } from '../utils/helpers';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { EmptyState, ErrorState } from '../components/ui/EmptyState';
+import { useAppContext } from '../context/AppContext';
 
 function AtRiskRow({ student }) {
   const [expanded, setExpanded] = useState(false);
@@ -14,7 +15,7 @@ function AtRiskRow({ student }) {
 
   return (
     <>
-      <tr className="border-b border-slate-100 hover:bg-slate-50">
+      <tr className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
         <td className="px-4 py-3">
           <Link to={`/students/${student.student_id}`} className="font-medium text-primary-600 hover:underline">{student.name}</Link>
           <span className="block text-xs text-slate-400">{student.roll_number}</span>
@@ -92,11 +93,11 @@ function AtRiskRow({ student }) {
 
 export default function AtRiskStudents() {
   usePageTitle('At-Risk Students');
+  const { activeAcademicYear } = useAppContext();
   const [filters, setFilters] = useState({ subjects: [], sections: [], semesters: [], academic_years: [] });
   const [subjectId, setSubjectId] = useState('');
   const [sectionId, setSectionId] = useState('');
   const [semester, setSemester] = useState('');
-  const [academicYear, setAcademicYear] = useState('');
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
@@ -107,14 +108,14 @@ export default function AtRiskStudents() {
   }, []);
 
   const loadData = useCallback(async () => {
+    if (!activeAcademicYear) return;
     setLoading(true);
     setError(null);
     try {
-      const params = {};
+      const params = { academic_year: activeAcademicYear };
       if (subjectId) params.subject_id = subjectId;
       if (sectionId) params.section_id = sectionId;
       if (semester) params.semester = semester;
-      if (academicYear) params.academic_year = academicYear;
       const res = await analyticsAPI.getAtRisk(params);
       setStudents(res.data);
     } catch (err) {
@@ -122,18 +123,17 @@ export default function AtRiskStudents() {
     } finally {
       setLoading(false);
     }
-  }, [subjectId, sectionId, semester, academicYear]);
+  }, [subjectId, sectionId, semester, activeAcademicYear]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
   const handleExport = async () => {
     setExporting(true);
     try {
-      const params = { format: 'csv' };
+      const params = { format: 'csv', academic_year: activeAcademicYear };
       if (subjectId) params.subject_id = subjectId;
       if (sectionId) params.section_id = sectionId;
       if (semester) params.semester = semester;
-      if (academicYear) params.academic_year = academicYear;
       await reportsAPI.export('at-risk', params);
       toast.success('At-risk report downloaded');
     } catch (err) {
@@ -163,34 +163,34 @@ export default function AtRiskStudents() {
       </div>
 
       <div className="card">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <select className="input-field" value={subjectId} onChange={(e) => setSubjectId(e.target.value)}>
             <option value="">All Subjects</option>
             {filters.subjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
           <select className="input-field" value={sectionId} onChange={(e) => setSectionId(e.target.value)}>
             <option value="">All Sections</option>
-            {filters.sections.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            {filters.sections.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name} {s.semester ? `(Sem ${s.semester}, ${s.academic_year})` : ''}
+              </option>
+            ))}
           </select>
           <select className="input-field" value={semester} onChange={(e) => setSemester(e.target.value)}>
             <option value="">All Semesters</option>
             {filters.semesters.map((s) => <option key={s} value={s}>Semester {s}</option>)}
           </select>
-          <select className="input-field" value={academicYear} onChange={(e) => setAcademicYear(e.target.value)}>
-            <option value="">All Years</option>
-            {filters.academic_years.map((y) => <option key={y} value={y}>{y}</option>)}
-          </select>
         </div>
       </div>
 
-      <div className="card overflow-hidden p-0">
+      <div className="card overflow-hidden p-0 glass-panel">
         {loading ? <div className="flex h-48 items-center justify-center"><LoadingSpinner /></div>
           : error ? <ErrorState message={error} onRetry={loadData} />
           : students.length === 0 ? <EmptyState title="No at-risk students" message="No students match the current risk criteria with these filters." />
           : (
-            <div className="overflow-x-auto">
+            <div className="table-container border-0 rounded-none shadow-none">
               <table className="w-full text-left text-sm">
-                <thead className="border-b bg-slate-50">
+                <thead className="table-header">
                   <tr>
                     <th className="px-4 py-3 font-medium text-slate-600">Student</th>
                     <th className="px-4 py-3 font-medium text-slate-600">Section</th>
@@ -204,8 +204,8 @@ export default function AtRiskStudents() {
                   </tr>
                 </thead>
                 <tbody>
-                  {students.map((s) => (
-                    <AtRiskRow key={`${s.student_id}-${s.subject}`} student={s} />
+                  {students.map((student) => (
+                    <AtRiskRow key={`${student.student_id}-${student.subject}`} student={student} />
                   ))}
                 </tbody>
               </table>

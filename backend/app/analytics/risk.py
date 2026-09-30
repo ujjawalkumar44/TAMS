@@ -2,21 +2,14 @@
 from app.core import thresholds as t
 
 
-def assessment_avg_pct(assignment: float, quiz: float, internal: float) -> float:
-    parts = [
-        (assignment / t.MAX_ASSIGNMENT) * 100,
-        (quiz / t.MAX_QUIZ) * 100,
-        (internal / t.MAX_INTERNAL) * 100,
-    ]
-    return sum(parts) / len(parts)
+def assessment_avg_pct(internal: float) -> float:
+    return (internal / t.MAX_INTERNAL) * 100
 
 
 def get_assessment_series(
-    assignment: float, quiz: float, internal: float, midterm: float, endterm: float
+    internal: float, midterm: float, endterm: float
 ) -> list[tuple[str, float]]:
     return [
-        ("Assignment", round((assignment / t.MAX_ASSIGNMENT) * 100, 1)),
-        ("Quiz", round((quiz / t.MAX_QUIZ) * 100, 1)),
         ("Internal", round((internal / t.MAX_INTERNAL) * 100, 1)),
         ("Midterm", round((midterm / t.MAX_MIDTERM) * 100, 1)),
         ("End Term", round((endterm / t.MAX_ENDTERM) * 100, 1)),
@@ -24,9 +17,9 @@ def get_assessment_series(
 
 
 def compute_performance_trend(
-    assignment: float, quiz: float, internal: float, midterm: float, endterm: float
+    internal: float, midterm: float, endterm: float
 ) -> str:
-    series = get_assessment_series(assignment, quiz, internal, midterm, endterm)
+    series = get_assessment_series(internal, midterm, endterm)
     values = [v for _, v in series]
 
     midterm_pct = (midterm / t.MAX_MIDTERM) * 100 if t.MAX_MIDTERM else 0
@@ -59,8 +52,8 @@ def get_recommended_actions(
         actions.append("Discuss attendance issue with the student")
     if marks_pct < t.AVERAGE_MIN:
         actions.append("Review difficult topics in a one-on-one session")
-    if any("below 50%" in r.lower() or "quiz" in r.lower() for r in reasons):
-        actions.append("Consider additional practice assignments")
+    if any("below 50%" in r.lower() or "internal" in r.lower() for r in reasons):
+        actions.append("Consider additional practice sessions")
     if trend == "Declining":
         actions.append("Monitor the next assessment closely")
     if attendance_pct < t.ATTENDANCE_WARNING_MIN:
@@ -73,8 +66,6 @@ def get_recommended_actions(
 def calculate_risk(
     marks_pct: float,
     attendance_pct: float,
-    assignment: float = 0,
-    quiz: float = 0,
     internal: float = 0,
     midterm: float = 0,
     endterm: float = 0,
@@ -95,10 +86,10 @@ def calculate_risk(
     if attendance_pct < t.ATTENDANCE_WARNING_MIN:
         score += t.RISK_POINTS_CRITICAL_ATTENDANCE
 
-    assess_avg = assessment_avg_pct(assignment, quiz, internal)
+    assess_avg = assessment_avg_pct(internal)
     if assess_avg < 50:
         score += t.RISK_POINTS_POOR_ASSESSMENT
-        reasons.append("Quiz/assignment/internal performance is consistently below 50%")
+        reasons.append("Internal performance is consistently below 50%")
 
     if midterm > 0 and endterm > 0:
         midterm_pct = (midterm / t.MAX_MIDTERM) * 100
@@ -110,7 +101,7 @@ def calculate_risk(
                 f"Latest assessment score decreased by {drop:.0f}% compared with midterm"
             )
 
-    trend = compute_performance_trend(assignment, quiz, internal, midterm, endterm)
+    trend = compute_performance_trend(internal, midterm, endterm)
     if trend == "Declining" and not any("decreased" in r for r in reasons):
         score += t.RISK_POINTS_DECLINING
         reasons.append("Overall performance trend is declining across assessments")
